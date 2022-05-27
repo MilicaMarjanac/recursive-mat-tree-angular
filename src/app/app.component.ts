@@ -50,6 +50,7 @@ export class ChecklistDatabase {
          this.buildFileTree(node.children)
        }
      }
+     console.log("test",newArr)
      return newArr
    }
 

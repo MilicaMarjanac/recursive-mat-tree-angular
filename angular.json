@@ -5,7 +5,12 @@
   "projects": {
     "mat-tree": {
       "projectType": "application",
-      "schematics": {},
+      "schematics": {
+        "@schematics/angular:component": {
+          "style": "scss",
+          "skipTests": true
+        }
+      },
       "root": "",
       "sourceRoot": "src",
       "prefix": "app",
@@ -58,7 +63,16 @@
                   "maximumError": "10kb"
                 }
               ]
+            },
+            "development": {
+              "buildOptimizer": false,
+              "optimization": false,
+              "vendorChunk": true,
+              "extractLicenses": false,
+              "sourceMap": true,
+              "namedChunks": true
             }
+
           }
         },
         "serve": {
@@ -69,8 +83,13 @@
           "configurations": {
             "production": {
               "browserTarget": "mat-tree:build:production"
-            }
-          }
+            },
+            
+                "development": { 
+                  "browserTarget": "mat-tree:build:development"
+                }
+          },
+          "defaultConfiguration": "development"
         },
         "extract-i18n": {
           "builder": "@angular-devkit/build-angular:extract-i18n",
