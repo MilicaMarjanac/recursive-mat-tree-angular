@@ -1,13 +1,19 @@
 <form class="example-form">
     <mat-form-field class="example-full-width" >
       <input matInput value=" " #searchBox autocomplete="off" (keyup)="applyFilter(searchBox.value)">
+      <mat-hint>Search...</mat-hint>
     </mat-form-field>
 </form>
 <mat-tree [dataSource]="dataSource" [treeControl]="treeControl">
     <mat-tree-node *matTreeNodeDef="let node" matTreeNodePadding >
-      <button mat-icon-button disabled></button>
-      <button mat-icon-button (click)="removeItem(node)"><mat-icon>clear</mat-icon></button>
+      <button *ngIf="treeControl.isExpandable(node)" mat-icon-button matTreeNodeToggle>
+        <mat-icon class="mat-icon-rtl-mirror">
+          {{treeControl.isExpanded(node) ? 'expand_more' : 'chevron_right'}}
+        </mat-icon>
+      </button>
       {{node.name}}
+      <button mat-icon-button (click)="addNewItem(node)"><mat-icon>add</mat-icon></button>
+      <button mat-icon-button (click)="removeItem(node)"><mat-icon>remove</mat-icon></button>
     </mat-tree-node>
 
     <mat-tree-node *matTreeNodeDef="let node; when: hasNoContent" matTreeNodePadding>
@@ -18,15 +24,8 @@
       </mat-form-field>
       <button mat-button (click)="saveNode(node, itemValue.value)">Save</button>
     </mat-tree-node>
-
-    <mat-tree-node  *matTreeNodeDef="let node;when: hasChild" matTreeNodePadding >
-      <button mat-icon-button matTreeNodeToggle>
-        <mat-icon class="mat-icon-rtl-mirror">
-          {{treeControl.isExpanded(node) ? 'expand_more' : 'chevron_right'}}
-        </mat-icon>
-      </button>
-      {{node.name}}
-      <button mat-icon-button (click)="addNewItem(node)"><mat-icon>add</mat-icon></button>
-    </mat-tree-node>
   </mat-tree>
+  <div *ngIf="dataSource.data.length<1">
+    <p>No results found...</p>
+  </div>
 
