@@ -68,11 +68,10 @@ export class Database {
   public insertNode(parent: FoodNode, name: string): void {
     if (parent.children) {
       parent.children.push({ name: name } as FoodNode);
-      this.dataChange.next(this.dataValue);
     } else {
       parent.children = [{ name: name } as FoodNode];
-      this.dataChange.next(this.dataValue);
     }
+    this.dataChange.next(this.dataValue);
   }
 
   public deleteNode(node: FoodNode): void {
