@@ -37,3 +37,7 @@ button{
   div p{
     padding-left: 30px;
   }
+
+  .hide{
+    display: none;
+  }
