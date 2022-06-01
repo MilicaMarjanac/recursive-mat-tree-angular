@@ -4,13 +4,15 @@ import {
   MatTreeFlatDataSource,
   MatTreeFlattener,
 } from "@angular/material/tree";
-import { BehaviorSubject } from "rxjs";
+import { BehaviorSubject, map } from "rxjs";
+import { HttpClient } from "@angular/common/http";
 
 /* interfaces */
 interface FoodNode {
   name: string;
   children?: FoodNode[];
   shouldHide?: boolean;
+  id: number;
 }
 
 interface ExampleFlatNode {
@@ -24,14 +26,26 @@ interface ExampleFlatNode {
 const TREE_DATA: FoodNode[] = [
   {
     name: "Fruits",
-    children: [{ name: "Bananas" }, { name: "Figs" }],
+    children: [
+      { name: "Bananas", id: 2 },
+      { name: "Figs", id: 3 },
+    ],
+    id: 1,
   },
   {
     name: "Vegetables",
     children: [
-      { name: "Pumpkins", children: [{ name: "White" }, { name: "Blue" }] },
-      { name: "Carrots" },
+      {
+        name: "Pumpkins",
+        children: [
+          { name: "White", id: 7 },
+          { name: "Blue", id: 8 },
+        ],
+        id: 5,
+      },
+      { name: "Carrots", id: 6 },
     ],
+    id: 4,
   },
 ];
 
@@ -40,16 +54,34 @@ const TREE_DATA: FoodNode[] = [
   providedIn: "root",
 })
 export class Database {
-  public dataChange = new BehaviorSubject<FoodNode[]>([]);
+  public id: string;
+  public treeChange$: BehaviorSubject<FoodNode[]>;
+  public isReload: boolean;
 
-  public get dataValue(): FoodNode[] {
-    return this.dataChange.value;
+  private endpoint = "https://angular-mat-tree-default-rtdb.firebaseio.com/node";
+
+  public get treeDataValue(): FoodNode[] {
+    return this.treeChange$.value;
   }
 
-  constructor() {
+  constructor(private http: HttpClient) {
     /* load initial data */
-    const data: FoodNode[] = this.buildTree(TREE_DATA);
-    this.dataChange.next(data);
+    const initialData: FoodNode[] = this.buildTree(TREE_DATA);
+    this.treeChange$ = new BehaviorSubject<FoodNode[]>(initialData);
+
+    if (!localStorage.getItem("tree-id")) {
+      this.http
+        .post<FoodNode[]>(`${this.endpoint}.json`, this.treeDataValue)
+        .subscribe((data: FoodNode[]) => {
+          if (data) {
+            this.initialLoad();
+          }
+        });
+    } else {
+      this.isReload = true;
+      this.id = localStorage.getItem("tree-id");
+      this.getItems();
+    }
   }
 
   /* initial tree build */
@@ -65,23 +97,80 @@ export class Database {
     return nodesArray;
   }
 
-  public insertNode(parent: FoodNode, name: string): void {
-    if (parent.children) {
-      parent.children.push({ name: name } as FoodNode);
-    } else {
-      parent.children = [{ name: name } as FoodNode];
-    }
-    this.dataChange.next(this.dataValue);
+ /* on first load only */
+  public initialLoad(): void {
+    this.http
+      .get<{[key: string]: FoodNode[]}>(`${this.endpoint}.json`)
+      .pipe(
+        map((res) => {
+          for (const key in res) {
+            if (res.hasOwnProperty(key)) {
+              this.id = key;
+              localStorage.setItem("tree-id", this.id);
+              return res[key];
+            }
+          }
+        })
+      )
+      .subscribe((data: FoodNode[]) => {
+        this.treeChange$.next(data);
+      });
   }
 
-  public deleteNode(node: FoodNode): void {
-    this.delete(node, this.dataValue);
-    this.dataChange.next(this.dataValue);
+  public getItems(): void {
+    this.http
+      .get<{[key: string]: FoodNode[]}>(`${this.endpoint}.json`)
+      .pipe(
+        map((res) => {
+          for (const key in res) {
+            if (res.hasOwnProperty(key)) {
+              return res[key];
+            }
+          }
+        })
+      )
+      .subscribe((data: FoodNode[]) => {
+        if (this.isReload) {
+          this.showAll(data);
+          this.isReload = false;
+        }
+        this.treeChange$.next(data);
+      });
+  }
+
+  public insertNode(parent: FoodNode, name: string): void {
+    const id = Math.random();
+    if (parent.children) {
+      parent.children.push({ name, id } as FoodNode);
+    } else {
+      parent.children = [{ name, id } as FoodNode];
+    }
+    this.treeChange$.next(this.treeDataValue);
+  }
+
+  private update(): void {
+    this.http
+      .put<FoodNode[]>(`${this.endpoint}/${this.id}.json`, this.treeDataValue)
+      .subscribe((data: FoodNode[]) => {
+        if (data) {
+          this.treeChange$.next(data);
+        }
+      });
+  }
+
+  public updateNode(node?: FoodNode, name?: string): void {
+    if (name) {
+      node.name = name;
+    }
+    this.update();
   }
 
   private delete(value: FoodNode, array: FoodNode[]): void {
     for (let i = array.length - 1; i >= 0; i--) {
-      if (array[i].name.toUpperCase() === value.name.toUpperCase()) {
+      if (
+        array[i].name.toUpperCase() === value.name.toUpperCase() &&
+        array[i].id === value.id
+      ) {
         array.splice(i, 1);
       } else {
         if (array[i].children) {
@@ -91,9 +180,19 @@ export class Database {
     }
   }
 
-  public updateNode(node: FoodNode, name: string): void {
-    node.name = name;
-    this.dataChange.next(this.dataValue);
+  public deleteNode(node: FoodNode): void {
+    this.delete(node, this.treeDataValue);
+    this.update();
+  }
+
+ /* if filters applied and page reloads, remove filters */
+  private showAll(array: FoodNode[]): void {
+    for (let i = array.length - 1; i >= 0; i--) {
+      if (array[i].children) {
+        this.showAll(array[i].children);
+      }
+      array[i].shouldHide = false;
+    }
   }
 }
 
@@ -125,11 +224,11 @@ export class AppComponent {
       this.treeFlattener
     );
 
-    database.dataChange.subscribe((data: FoodNode[]) => {
+    database.treeChange$.subscribe((data: FoodNode[]) => {
       this.dataSource.data = data;
+      this.treeControl.expandAll();
     });
   }
-
   private getLevel = (node: ExampleFlatNode) => node.level;
 
   private isExpandable = (node: ExampleFlatNode) => node.expandable;
@@ -145,9 +244,7 @@ export class AppComponent {
   private transformer = (node: FoodNode, level: number) => {
     const existingNode = this.nestedToFlatNodeMap.get(node);
     const flatNode =
-      existingNode && existingNode.name === node.name
-        ? existingNode
-        : {
+      existingNode && existingNode.name === node.name ? existingNode : {
           expandable: false,
           name: "",
           level: 0,
@@ -158,6 +255,7 @@ export class AppComponent {
     flatNode.level = level;
     flatNode.expandable = node.children && !!node.children.length;
     flatNode.shouldHide = node.shouldHide ?? false;
+
     this.flatToNestedNodeMap.set(flatNode, node);
     this.nestedToFlatNodeMap.set(node, flatNode);
     return flatNode;
@@ -172,20 +270,17 @@ export class AppComponent {
   public saveNode(node: ExampleFlatNode, itemValue: string): void {
     const nestedNode = this.flatToNestedNodeMap.get(node);
     this.database.updateNode(nestedNode!, itemValue);
-    this.treeControl.expand(node);
   }
 
   public removeNode(node: ExampleFlatNode): void {
     const nestedNode = this.flatToNestedNodeMap.get(node);
     this.database.deleteNode(nestedNode!);
-    this.treeControl.expand(node);
   }
 
-  // clone backupTreeData for filter search use only so  main datasource remains untouched
   public applyFilter(value: string): void {
     value = value.toUpperCase().trim();
     this.search(value, this.dataSource.data);
-    this.database.dataChange.next(this.database.dataValue);
+    this.database.treeChange$.next(this.database.treeDataValue);
     this.treeControl.expandAll();
   }
 
@@ -209,6 +304,6 @@ export class AppComponent {
         }
       }
     }
-    return array.length == array.filter((i) => i.shouldHide).length;
+    return array.length === array.filter((i: FoodNode) => i.shouldHide).length;
   }
 }

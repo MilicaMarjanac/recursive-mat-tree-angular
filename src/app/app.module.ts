@@ -8,6 +8,7 @@ import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import {MatInputModule} from '@angular/material/input';
 import {MatTreeModule} from '@angular/material/tree';
 import {MatIconModule} from '@angular/material/icon';
+import { HttpClientModule } from '@angular/common/http';
 
 
 @NgModule({
@@ -20,7 +21,9 @@ import {MatIconModule} from '@angular/material/icon';
     BrowserAnimationsModule,
     MatInputModule,
     MatTreeModule,
-    MatIconModule
+    MatIconModule,
+    HttpClientModule
+
   ],
   providers: [],
   bootstrap: [AppComponent]
