@@ -58,7 +58,7 @@ export class Database {
   public treeChange$: BehaviorSubject<FoodNode[]>;
   public isReload: boolean;
 
-  private endpoint = "https://angular-mat-tree-default-rtdb.firebaseio.com/node";
+  private endpoint = "https://mat-tree-default-rtdb.firebaseio.com/node";
 
   public get treeDataValue(): FoodNode[] {
     return this.treeChange$.value;
