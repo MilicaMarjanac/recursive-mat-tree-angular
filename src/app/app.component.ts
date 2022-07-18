@@ -1,4 +1,10 @@
-import { Component, Injectable } from "@angular/core";
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  Injectable,
+  ViewChild,
+} from "@angular/core";
 import { FlatTreeControl } from "@angular/cdk/tree";
 import {
   MatTreeFlatDataSource,
@@ -6,6 +12,8 @@ import {
 } from "@angular/material/tree";
 import { BehaviorSubject, map } from "rxjs";
 import { HttpClient } from "@angular/common/http";
+import { fromEvent } from "rxjs";
+import { debounceTime, distinctUntilChanged } from "rxjs/operators";
 
 /* interfaces */
 interface FoodNode {
@@ -97,10 +105,10 @@ export class Database {
     return nodesArray;
   }
 
- /* on first load only */
+  /* on first load only */
   public initialLoad(): void {
     this.http
-      .get<{[key: string]: FoodNode[]}>(`${this.endpoint}.json`)
+      .get<{ [key: string]: FoodNode[] }>(`${this.endpoint}.json`)
       .pipe(
         map((res) => {
           for (const key in res) {
@@ -119,7 +127,7 @@ export class Database {
 
   public getItems(): void {
     this.http
-      .get<{[key: string]: FoodNode[]}>(`${this.endpoint}.json`)
+      .get<{ [key: string]: FoodNode[] }>(`${this.endpoint}.json`)
       .pipe(
         map((res) => {
           for (const key in res) {
@@ -185,7 +193,7 @@ export class Database {
     this.update();
   }
 
- /* if filters applied and page reloads, remove filters */
+  /* if filters applied and page reloads, remove filters */
   private showAll(array: FoodNode[]): void {
     for (let i = array.length - 1; i >= 0; i--) {
       if (array[i].children) {
@@ -201,7 +209,9 @@ export class Database {
   templateUrl: "./app.component.html",
   styleUrls: ["./app.component.css"],
 })
-export class AppComponent {
+export class AppComponent implements AfterViewInit {
+  @ViewChild("searchBox", { static: false }) searchBox: ElementRef<HTMLElement>;
+
   private flatToNestedNodeMap = new Map<ExampleFlatNode, FoodNode>();
   private nestedToFlatNodeMap = new Map<FoodNode, ExampleFlatNode>();
   public treeControl: FlatTreeControl<ExampleFlatNode>;
@@ -229,6 +239,13 @@ export class AppComponent {
       this.treeControl.expandAll();
     });
   }
+
+  ngAfterViewInit(): void {
+    if (this.searchBox) {
+      this.applyFilter();
+    }
+  }
+
   private getLevel = (node: ExampleFlatNode) => node.level;
 
   private isExpandable = (node: ExampleFlatNode) => node.expandable;
@@ -244,12 +261,14 @@ export class AppComponent {
   private transformer = (node: FoodNode, level: number) => {
     const existingNode = this.nestedToFlatNodeMap.get(node);
     const flatNode =
-      existingNode && existingNode.name === node.name ? existingNode : {
-          expandable: false,
-          name: "",
-          level: 0,
-          shouldHide: false,
-        };
+      existingNode && existingNode.name === node.name
+        ? existingNode
+        : {
+            expandable: false,
+            name: "",
+            level: 0,
+            shouldHide: false,
+          };
 
     flatNode.name = node.name;
     flatNode.level = level;
@@ -277,11 +296,30 @@ export class AppComponent {
     this.database.deleteNode(nestedNode!);
   }
 
-  public applyFilter(value: string): void {
-    value = value.toUpperCase().trim();
-    this.search(value, this.dataSource.data);
-    this.database.treeChange$.next(this.database.treeDataValue);
-    this.treeControl.expandAll();
+  /* send request only if string is longer than 1 character */
+  public applyFilter(): void {
+    if (this.searchBox.nativeElement) {
+      fromEvent(this.searchBox.nativeElement, "input")
+        .pipe(
+          map((event: any) => {
+            return event.target.value;
+          }),
+          debounceTime(500),
+          distinctUntilChanged()
+        )
+        .subscribe((result: string) => {
+          result = result.toUpperCase().trim();
+          if (result && result.length > 1) {
+            this.search(result, this.dataSource.data);
+          }
+          if (result.length < 2) {
+            result = "";
+            this.search(result, this.dataSource.data);
+          }
+          this.database.treeChange$.next(this.database.treeDataValue);
+          this.treeControl.expandAll();
+        });
+    }
   }
 
   private search(value: string, array: FoodNode[]): boolean {
