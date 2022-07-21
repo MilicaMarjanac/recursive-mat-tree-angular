@@ -77,7 +77,7 @@ export class Database {
     const initialData: FoodNode[] = this.buildTree(TREE_DATA);
     this.treeChange$ = new BehaviorSubject<FoodNode[]>(initialData);
 
-    if (!localStorage.getItem("tree-id")) {
+    if (!sessionStorage.getItem("tree-id")) {
       this.http
         .post<FoodNode[]>(`${this.endpoint}.json`, this.treeDataValue)
         .subscribe((data: FoodNode[]) => {
@@ -87,7 +87,7 @@ export class Database {
         });
     } else {
       this.isReload = true;
-      this.id = localStorage.getItem("tree-id");
+      this.id = sessionStorage.getItem("tree-id");
       this.getItems();
     }
   }
@@ -114,7 +114,7 @@ export class Database {
           for (const key in res) {
             if (res.hasOwnProperty(key)) {
               this.id = key;
-              localStorage.setItem("tree-id", this.id);
+              sessionStorage.setItem("tree-id", this.id);
               return res[key];
             }
           }
